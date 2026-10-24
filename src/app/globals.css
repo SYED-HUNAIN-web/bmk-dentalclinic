@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* LIGHT THEME (Warm Ivory & Deep Forest) */
+  --bg-primary: #F7F5EF;
+  --bg-secondary: #EFECE3;
+  --bg-card: #FAF9F6;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #EFECE3;
+  --bg-accent-dark: #103629;
+  --bg-accent-contrast: #0A241B;
+
+  --text-primary: #103629;
+  --text-secondary: #545C57;
+  --text-body: #202622;
+  --text-muted: #707873;
+  --text-inverse: #F7F5EF;
+
+  --border-editorial: #E4E0D6;
+  --border-subtle: #EDE9DF;
+  --border-strong: #D3CCBE;
+
+  --brass-accent: #B69A61;
+  --brass-hover: #CBB584;
+
+  --font-dm-serif: 'DM Serif Display', Georgia, serif;
+  --font-dm-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+}
+
+.dark, [data-theme="dark"] {
+  /* DARK THEME (Deep Forest & Charcoal with Warm Ivory text & Muted Brass) */
+  --bg-primary: #0A1B14;
+  --bg-secondary: #0F261D;
+  --bg-card: #143026;
+  --bg-surface: #102B21;
+  --bg-elevated: #18382C;
+  --bg-accent-dark: #183C2F;
+  --bg-accent-contrast: #06120D;
+
+  --text-primary: #F7F5EF;
+  --text-secondary: #CBD5CF;
+  --text-body: #EFECE3;
+  --text-muted: #95A39B;
+  --text-inverse: #0A1B14;
+
+  --border-editorial: #1E4234;
+  --border-subtle: #173328;
+  --border-strong: #275241;
+
+  --brass-accent: #CBB584;
+  --brass-hover: #D8C59E;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--bg-primary);
+    color: var(--text-body);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: var(--font-dm-sans);
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-body);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    font-family: var(--font-dm-sans);
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-dm-serif);
+  }
+
+  ::selection {
+    background-color: #103629;
+    color: #F7F5EF;
+  }
+
+  .dark ::selection {
+    background-color: #B69A61;
+    color: #0A1B14;
+  }
+}
+
+/* Editorial Typography Tokens */
+.font-editorial-headline {
+  font-family: var(--font-dm-serif);
+  letter-spacing: -0.015em;
+  line-height: 1.06;
+}
+
+.font-editorial-body {
+  font-family: var(--font-dm-sans);
+}
+
+.border-editorial {
+  border-color: var(--border-editorial);
+}
+
+.editorial-divider {
+  height: 1px;
+  background-color: var(--border-editorial);
+}
+
+.editorial-brass-line {
+  height: 1px;
+  background-color: var(--brass-accent);
+}
+
+.editorial-tag {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  font-family: var(--font-dm-sans);
+  font-weight: 500;
+}
+
+/* Subtle, dignified entrance animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Reduced Motion Compliance */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
