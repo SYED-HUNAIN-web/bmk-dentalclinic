@@ -473,43 +473,50 @@ export async function deleteCaseAction(id: string): Promise<CmsResponse> {
 // ============================================================================
 
 export async function uploadClinicMediaAction(formData: FormData): Promise<CmsResponse<{ url: string; path: string }>> {
-  const r = await requireAdmin();
-  if (!r.ok) return { success: false, message: r.message };
-
-  const file = formData.get("file") as File | null;
-  if (!file) {
-    return { success: false, message: "No image file provided for upload." };
-  }
-
-  // Validate file size: 15MB limit
-  const MAX_SIZE_BYTES = 15 * 1024 * 1024;
-  if (file.size > MAX_SIZE_BYTES) {
-    return { success: false, message: "Image exceeds 15MB size limit." };
-  }
-
-  // Validate MIME type
-  const allowedTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/svg+xml",
-    "image/gif",
-  ];
-  if (!allowedTypes.includes(file.type)) {
-    return {
-      success: false,
-      message: `Unsupported file type (${file.type}). Allowed: JPG, PNG, WEBP, SVG, GIF.`,
-    };
-  }
-
-  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const sanitizedName = file.name
-    .replace(/\.[^/.]+$/, "")
-    .replace(/[^a-zA-Z0-9-_]/g, "_")
-    .slice(0, 32);
-  const storagePath = `cms/${Date.now()}_${sanitizedName}.${ext}`;
-
   try {
+    const r = await requireAdmin();
+    if (!r.ok) return { success: false, message: r.message };
+
+    if (!formData) {
+      return { success: false, message: "No form data provided." };
+    }
+
+    const file = formData.get("file") as File | null;
+    if (!file) {
+      return { success: false, message: "No image file provided for upload." };
+    }
+
+    // Validate file size: 4.5MB limit to prevent Vercel Serverless payload drops
+    const MAX_SIZE_BYTES = 4.5 * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) {
+      return {
+        success: false,
+        message: `Image exceeds 4.5MB size limit (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please choose an image under 4.5MB for web display.`,
+      };
+    }
+
+    // Validate MIME type
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/svg+xml",
+      "image/gif",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      return {
+        success: false,
+        message: `Unsupported file type (${file.type || "unknown"}). Allowed: JPG, PNG, WEBP, SVG, GIF.`,
+      };
+    }
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const sanitizedName = (file.name || "image")
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[^a-zA-Z0-9-_]/g, "_")
+      .slice(0, 32);
+    const storagePath = `cms/${Date.now()}_${sanitizedName}.${ext}`;
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
@@ -537,6 +544,10 @@ export async function uploadClinicMediaAction(formData: FormData): Promise<CmsRe
       },
     };
   } catch (err: any) {
-    return { success: false, message: `Upload exception: ${err?.message || "Unknown error"}` };
+    console.error("[uploadClinicMediaAction] Unexpected error:", err);
+    return {
+      success: false,
+      message: `Upload failed: ${err?.message || "Unexpected server error during upload."}`,
+    };
   }
 }

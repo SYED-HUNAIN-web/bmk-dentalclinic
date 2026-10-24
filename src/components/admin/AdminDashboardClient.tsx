@@ -325,13 +325,24 @@ export default function AdminDashboardClient({
   const handleCmsFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Client-side quick check for file size (Vercel serverless request body is capped at 4.5MB)
+    if (file.size > 4.5 * 1024 * 1024) {
+      setCmsFeedback({
+        type: "error",
+        text: `Image "${file.name}" is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Vercel allows uploads up to 4.5MB. Please choose or compress to under 4.5MB.`,
+      });
+      e.target.value = "";
+      return;
+    }
+
     setIsUploading(true);
     setCmsFeedback(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
       const res = await uploadClinicMediaAction(formData);
-      if (res.success && res.data?.url) {
+      if (res && res.success && res.data?.url) {
         if (cmsModalType === "staff") {
           setStaffForm((prev) => ({ ...prev, image_path: res.data!.url }));
         } else if (cmsModalType === "service") {
@@ -341,12 +352,17 @@ export default function AdminDashboardClient({
         }
         setCmsFeedback({ type: "success", text: "Image successfully uploaded to clinic-media storage." });
       } else {
-        setCmsFeedback({ type: "error", text: res.message || "Failed to upload image." });
+        const errorMsg = res?.message || "Failed to upload image. Please verify admin session and storage permissions.";
+        setCmsFeedback({ type: "error", text: errorMsg });
       }
     } catch (err: any) {
-      setCmsFeedback({ type: "error", text: err?.message || "Upload error occurred." });
+      setCmsFeedback({ type: "error", text: err?.message || "Upload network error occurred." });
     } finally {
       setIsUploading(false);
+      // Reset input element value so re-selecting the same file will trigger onChange again
+      if (e.target) {
+        e.target.value = "";
+      }
     }
   };
 
@@ -376,23 +392,23 @@ export default function AdminDashboardClient({
 
         if (cmsModalMode === "create") {
           const res = await createStaffAction(payload);
-          if (res.success) {
-            setCmsFeedback({ type: "success", text: res.message });
+          if (res?.success) {
+            setCmsFeedback({ type: "success", text: res.message || "Faculty member added successfully." });
             const ref = await getAdminStaffAction();
-            if (ref.data) setLiveStaff(ref.data);
+            if (ref?.data) setLiveStaff(ref.data);
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
-            setCmsFeedback({ type: "error", text: res.message });
+            setCmsFeedback({ type: "error", text: res?.message || "Failed to create faculty member." });
           }
         } else if (editingItemId) {
           const res = await updateStaffAction(editingItemId, payload);
-          if (res.success) {
-            setCmsFeedback({ type: "success", text: res.message });
+          if (res?.success) {
+            setCmsFeedback({ type: "success", text: res.message || "Faculty member updated successfully." });
             const ref = await getAdminStaffAction();
-            if (ref.data) setLiveStaff(ref.data);
+            if (ref?.data) setLiveStaff(ref.data);
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
-            setCmsFeedback({ type: "error", text: res.message });
+            setCmsFeedback({ type: "error", text: res?.message || "Failed to update faculty member." });
           }
         }
       } else if (cmsModalType === "service") {
@@ -415,23 +431,23 @@ export default function AdminDashboardClient({
 
         if (cmsModalMode === "create") {
           const res = await createServiceAction(payload);
-          if (res.success) {
-            setCmsFeedback({ type: "success", text: res.message });
+          if (res?.success) {
+            setCmsFeedback({ type: "success", text: res.message || "Procedure added successfully." });
             const ref = await getAdminServicesAction();
-            if (ref.data) setLiveServices(ref.data);
+            if (ref?.data) setLiveServices(ref.data);
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
-            setCmsFeedback({ type: "error", text: res.message });
+            setCmsFeedback({ type: "error", text: res?.message || "Failed to create procedure." });
           }
         } else if (editingItemId) {
           const res = await updateServiceAction(editingItemId, payload);
-          if (res.success) {
-            setCmsFeedback({ type: "success", text: res.message });
+          if (res?.success) {
+            setCmsFeedback({ type: "success", text: res.message || "Procedure updated successfully." });
             const ref = await getAdminServicesAction();
-            if (ref.data) setLiveServices(ref.data);
+            if (ref?.data) setLiveServices(ref.data);
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
-            setCmsFeedback({ type: "error", text: res.message });
+            setCmsFeedback({ type: "error", text: res?.message || "Failed to update procedure." });
           }
         }
       } else if (cmsModalType === "case") {
@@ -450,23 +466,23 @@ export default function AdminDashboardClient({
 
         if (cmsModalMode === "create") {
           const res = await createCaseAction(payload);
-          if (res.success) {
-            setCmsFeedback({ type: "success", text: res.message });
+          if (res?.success) {
+            setCmsFeedback({ type: "success", text: res.message || "Case added successfully." });
             const ref = await getAdminCasesAction();
-            if (ref.data) setLiveCases(ref.data);
+            if (ref?.data) setLiveCases(ref.data);
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
-            setCmsFeedback({ type: "error", text: res.message });
+            setCmsFeedback({ type: "error", text: res?.message || "Failed to create case." });
           }
         } else if (editingItemId) {
           const res = await updateCaseAction(editingItemId, payload);
-          if (res.success) {
-            setCmsFeedback({ type: "success", text: res.message });
+          if (res?.success) {
+            setCmsFeedback({ type: "success", text: res.message || "Case updated successfully." });
             const ref = await getAdminCasesAction();
-            if (ref.data) setLiveCases(ref.data);
+            if (ref?.data) setLiveCases(ref.data);
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
-            setCmsFeedback({ type: "error", text: res.message });
+            setCmsFeedback({ type: "error", text: res?.message || "Failed to update case." });
           }
         }
       }
@@ -479,35 +495,47 @@ export default function AdminDashboardClient({
 
   // Toggle publish
   const handleTogglePublishStaff = async (id: string, current: boolean) => {
-    const res = await updateStaffAction(id, { is_published: !current });
-    if (res.success) {
-      setLiveStaff((prev) =>
-        prev.map((m) => (m.id === id || m._dbId === id ? { ...m, is_published: !current } : m))
-      );
-    } else {
-      alert(res.message);
+    try {
+      const res = await updateStaffAction(id, { is_published: !current });
+      if (res?.success) {
+        setLiveStaff((prev) =>
+          prev.map((m) => (m.id === id || m._dbId === id ? { ...m, is_published: !current } : m))
+        );
+      } else {
+        alert(res?.message || "Failed to update publication status.");
+      }
+    } catch (e: any) {
+      alert(e?.message || "Error updating publication status.");
     }
   };
 
   const handleTogglePublishService = async (id: string, current: boolean) => {
-    const res = await updateServiceAction(id, { is_published: !current });
-    if (res.success) {
-      setLiveServices((prev) =>
-        prev.map((s) => (s.id === id || s._dbId === id ? { ...s, is_published: !current } : s))
-      );
-    } else {
-      alert(res.message);
+    try {
+      const res = await updateServiceAction(id, { is_published: !current });
+      if (res?.success) {
+        setLiveServices((prev) =>
+          prev.map((s) => (s.id === id || s._dbId === id ? { ...s, is_published: !current } : s))
+        );
+      } else {
+        alert(res?.message || "Failed to update publication status.");
+      }
+    } catch (e: any) {
+      alert(e?.message || "Error updating publication status.");
     }
   };
 
   const handleTogglePublishCase = async (id: string, current: boolean) => {
-    const res = await updateCaseAction(id, { is_published: !current });
-    if (res.success) {
-      setLiveCases((prev) =>
-        prev.map((c) => (c.id === id || c._dbId === id ? { ...c, is_published: !current } : c))
-      );
-    } else {
-      alert(res.message);
+    try {
+      const res = await updateCaseAction(id, { is_published: !current });
+      if (res?.success) {
+        setLiveCases((prev) =>
+          prev.map((c) => (c.id === id || c._dbId === id ? { ...c, is_published: !current } : c))
+        );
+      } else {
+        alert(res?.message || "Failed to update publication status.");
+      }
+    } catch (e: any) {
+      alert(e?.message || "Error updating publication status.");
     }
   };
 
@@ -517,12 +545,16 @@ export default function AdminDashboardClient({
       setDeleteConfirmId(id);
       return;
     }
-    const res = await deleteStaffAction(id);
-    if (res.success) {
-      setLiveStaff((prev) => prev.filter((m) => m.id !== id && m._dbId !== id));
-      setDeleteConfirmId(null);
-    } else {
-      alert(res.message);
+    try {
+      const res = await deleteStaffAction(id);
+      if (res?.success) {
+        setLiveStaff((prev) => prev.filter((m) => m.id !== id && m._dbId !== id));
+        setDeleteConfirmId(null);
+      } else {
+        alert(res?.message || "Failed to delete staff member.");
+      }
+    } catch (e: any) {
+      alert(e?.message || "Error deleting staff member.");
     }
   };
 
@@ -531,12 +563,16 @@ export default function AdminDashboardClient({
       setDeleteConfirmId(id);
       return;
     }
-    const res = await deleteServiceAction(id);
-    if (res.success) {
-      setLiveServices((prev) => prev.filter((s) => s.id !== id && s._dbId !== id));
-      setDeleteConfirmId(null);
-    } else {
-      alert(res.message);
+    try {
+      const res = await deleteServiceAction(id);
+      if (res?.success) {
+        setLiveServices((prev) => prev.filter((s) => s.id !== id && s._dbId !== id));
+        setDeleteConfirmId(null);
+      } else {
+        alert(res?.message || "Failed to delete service.");
+      }
+    } catch (e: any) {
+      alert(e?.message || "Error deleting service.");
     }
   };
 
@@ -545,12 +581,16 @@ export default function AdminDashboardClient({
       setDeleteConfirmId(id);
       return;
     }
-    const res = await deleteCaseAction(id);
-    if (res.success) {
-      setLiveCases((prev) => prev.filter((c) => c.id !== id && c._dbId !== id));
-      setDeleteConfirmId(null);
-    } else {
-      alert(res.message);
+    try {
+      const res = await deleteCaseAction(id);
+      if (res?.success) {
+        setLiveCases((prev) => prev.filter((c) => c.id !== id && c._dbId !== id));
+        setDeleteConfirmId(null);
+      } else {
+        alert(res?.message || "Failed to delete case.");
+      }
+    } catch (e: any) {
+      alert(e?.message || "Error deleting case.");
     }
   };
 
