@@ -10,6 +10,8 @@ export const metadata = {
   },
 };
 
+export const revalidate = 60;
+
 export default async function ClientWorkPage() {
   const cases = await getPublicCases();
 

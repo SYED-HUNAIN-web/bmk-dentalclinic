@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X, ArrowUpRight, Phone } from "lucide-react";
@@ -87,10 +88,13 @@ export default function Navigation() {
           <div className="flex items-center justify-between h-20 sm:h-22">
             {/* Logo + Wordmark */}
             <Link href="/" className="group flex items-center gap-3 sm:gap-3.5 py-1">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-sm overflow-hidden border border-[#E4E0D6] dark:border-[#1E4234] bg-[#202622] shrink-0 shadow-xs group-hover:border-[#B69A61] transition-colors">
-                <img
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-sm overflow-hidden border border-[#E4E0D6] dark:border-[#1E4234] bg-[#202622] shrink-0 shadow-xs group-hover:border-[#B69A61] transition-colors relative">
+                <Image
                   src="/media/logo.jpeg"
                   alt="BMK Dental & Maxillofacial Clinic Logo"
+                  width={44}
+                  height={44}
+                  priority
                   className="w-full h-full object-cover"
                 />
               </div>

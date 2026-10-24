@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { CLINIC_INFO } from "@/data/mediaManifest";
 import { ShieldAlert, ArrowRight, Clock, MapPin, Phone } from "lucide-react";
 import { WhatsAppIcon, FacebookIcon, InstagramIcon } from "@/components/BrandIcons";
@@ -49,10 +50,12 @@ export default function Footer() {
           {/* Col 1: Clinic Identity & Lead */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-sm overflow-hidden border border-[#174635] bg-[#202622] shrink-0 shadow-sm">
-                <img
+              <div className="w-11 h-11 rounded-sm overflow-hidden border border-[#174635] bg-[#202622] shrink-0 shadow-sm relative">
+                <Image
                   src="/media/logo.jpeg"
                   alt="BMK Clinic Logo"
+                  width={44}
+                  height={44}
                   className="w-full h-full object-cover"
                 />
               </div>
