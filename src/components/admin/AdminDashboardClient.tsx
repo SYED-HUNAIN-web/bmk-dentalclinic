@@ -352,11 +352,11 @@ export default function AdminDashboardClient({
         }
         setCmsFeedback({ type: "success", text: "Image successfully uploaded to clinic-media storage." });
       } else {
-        const errorMsg = res?.message || "Failed to upload image. Please verify admin session and storage permissions.";
+        const errorMsg = res?.message || "Failed to upload image. Unexpected empty response from server.";
         setCmsFeedback({ type: "error", text: errorMsg });
       }
     } catch (err: any) {
-      setCmsFeedback({ type: "error", text: err?.message || "Upload network error occurred." });
+      setCmsFeedback({ type: "error", text: err?.message ? `Upload error: ${err.message}` : "Upload network error occurred." });
     } finally {
       setIsUploading(false);
       // Reset input element value so re-selecting the same file will trigger onChange again
