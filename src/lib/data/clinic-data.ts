@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createPublicServerClient } from "@/lib/supabase/public";
 import {
   CLINIC_INFO,
   CLINIC_TEAM,
@@ -11,7 +11,7 @@ import {
 
 export async function getPublicSiteSettings() {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createPublicServerClient();
     if (!supabase) return CLINIC_INFO;
 
     const { data, error } = await (supabase.from("site_settings") as any)
@@ -47,7 +47,7 @@ export async function getPublicSiteSettings() {
 
 export async function getPublicStaff(): Promise<TeamMember[]> {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createPublicServerClient();
     if (!supabase) return CLINIC_TEAM;
 
     const { data, error } = await (supabase.from("staff") as any)
@@ -83,7 +83,7 @@ export async function getPublicStaff(): Promise<TeamMember[]> {
 
 export async function getPublicServices(): Promise<ClinicService[]> {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createPublicServerClient();
     if (!supabase) return CLINIC_SERVICES;
 
     const { data, error } = await (supabase.from("services") as any)
@@ -124,7 +124,7 @@ export async function getPublicServices(): Promise<ClinicService[]> {
 
 export async function getPublicCases(): Promise<ClientCase[]> {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createPublicServerClient();
     if (!supabase) return CLIENT_CASES;
 
     const { data, error } = await (supabase.from("projects") as any)

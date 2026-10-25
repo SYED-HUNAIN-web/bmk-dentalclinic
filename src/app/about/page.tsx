@@ -28,8 +28,10 @@ export const metadata = {
 export const revalidate = 60;
 
 export default async function AboutPage() {
-  const clinicTeam = await getPublicStaff();
-  const clinicSettings = await getPublicSiteSettings();
+  const [clinicTeam, clinicSettings] = await Promise.all([
+    getPublicStaff(),
+    getPublicSiteSettings(),
+  ]);
 
   const drVishal =
     clinicTeam.find((m) => m.id === "dr-vishal-lohana" || m.name.toLowerCase().includes("vishal")) ||

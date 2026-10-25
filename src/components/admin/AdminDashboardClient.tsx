@@ -231,7 +231,7 @@ export default function AdminDashboardClient({
       sort_order: item.sort_order ?? 10,
       is_published: item.is_published ?? true,
     });
-    setEditingItemId(item.id || item._dbId);
+    setEditingItemId(item._dbId || item.id);
     setCmsModalMode("edit");
     setCmsModalType("staff");
     setCmsFeedback(null);
@@ -274,7 +274,7 @@ export default function AdminDashboardClient({
       sort_order: item.sort_order ?? 10,
       is_published: item.is_published ?? true,
     });
-    setEditingItemId(item.id || item._dbId);
+    setEditingItemId(item._dbId || item.id);
     setCmsModalMode("edit");
     setCmsModalType("service");
     setCmsFeedback(null);
@@ -314,31 +314,92 @@ export default function AdminDashboardClient({
       sort_order: item.sort_order ?? 10,
       is_published: item.is_published ?? true,
     });
-    setEditingItemId(item.id || item._dbId);
+    setEditingItemId(item._dbId || item.id);
     setCmsModalMode("edit");
     setCmsModalType("case");
     setCmsFeedback(null);
     setCmsModalOpen(true);
   };
 
+  // Client-side image optimization (resizes large camera photos to max 1920px & WebP to stay well under Vercel 4.5MB limit)
+  const optimizeImageForUpload = async (file: File): Promise<File> => {
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml" || file.type === "image/gif") {
+      return file;
+    }
+    if (file.size < 750 * 1024) {
+      return file;
+    }
+
+    return new Promise((resolve) => {
+      const img = document.createElement("img");
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const maxDim = 1920;
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.size < file.size) {
+              const ext = blob.type === "image/webp" ? "webp" : "jpg";
+              const newName = file.name.replace(/\.[^/.]+$/, `.${ext}`);
+              const optimized = new File([blob], newName, { type: blob.type });
+              resolve(optimized);
+            } else {
+              resolve(file);
+            }
+          },
+          "image/webp",
+          0.85
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      };
+      img.src = objectUrl;
+    });
+  };
+
   // Image Upload handler
   const handleCmsFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Client-side quick check for file size (Vercel serverless request body is capped at 4.5MB)
-    if (file.size > 4.5 * 1024 * 1024) {
-      setCmsFeedback({
-        type: "error",
-        text: `Image "${file.name}" is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Vercel allows uploads up to 4.5MB. Please choose or compress to under 4.5MB.`,
-      });
-      e.target.value = "";
-      return;
-    }
+    const originalFile = e.target.files?.[0];
+    if (!originalFile) return;
 
     setIsUploading(true);
     setCmsFeedback(null);
     try {
+      const file = await optimizeImageForUpload(originalFile);
+
+      if (file.size > 4.5 * 1024 * 1024) {
+        setCmsFeedback({
+          type: "error",
+          text: `Image "${file.name}" is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Vercel allows uploads up to 4.5MB. Please choose or compress to under 4.5MB.`,
+        });
+        return;
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       const res = await uploadClinicMediaAction(formData);
@@ -395,7 +456,11 @@ export default function AdminDashboardClient({
           if (res?.success) {
             setCmsFeedback({ type: "success", text: res.message || "Faculty member added successfully." });
             const ref = await getAdminStaffAction();
-            if (ref?.data) setLiveStaff(ref.data);
+            if (ref?.data && ref.data.length > 0) {
+              setLiveStaff(ref.data);
+            } else if (res.data) {
+              setLiveStaff((prev) => [...prev, res.data]);
+            }
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
             setCmsFeedback({ type: "error", text: res?.message || "Failed to create faculty member." });
@@ -405,7 +470,17 @@ export default function AdminDashboardClient({
           if (res?.success) {
             setCmsFeedback({ type: "success", text: res.message || "Faculty member updated successfully." });
             const ref = await getAdminStaffAction();
-            if (ref?.data) setLiveStaff(ref.data);
+            if (ref?.data && ref.data.length > 0) {
+              setLiveStaff(ref.data);
+            } else if (res.data) {
+              setLiveStaff((prev) =>
+                prev.map((m) =>
+                  m.id === editingItemId || m._dbId === editingItemId || m.slug === editingItemId
+                    ? { ...m, ...res.data }
+                    : m
+                )
+              );
+            }
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
             setCmsFeedback({ type: "error", text: res?.message || "Failed to update faculty member." });
@@ -434,7 +509,11 @@ export default function AdminDashboardClient({
           if (res?.success) {
             setCmsFeedback({ type: "success", text: res.message || "Procedure added successfully." });
             const ref = await getAdminServicesAction();
-            if (ref?.data) setLiveServices(ref.data);
+            if (ref?.data && ref.data.length > 0) {
+              setLiveServices(ref.data);
+            } else if (res.data) {
+              setLiveServices((prev) => [...prev, res.data]);
+            }
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
             setCmsFeedback({ type: "error", text: res?.message || "Failed to create procedure." });
@@ -444,7 +523,17 @@ export default function AdminDashboardClient({
           if (res?.success) {
             setCmsFeedback({ type: "success", text: res.message || "Procedure updated successfully." });
             const ref = await getAdminServicesAction();
-            if (ref?.data) setLiveServices(ref.data);
+            if (ref?.data && ref.data.length > 0) {
+              setLiveServices(ref.data);
+            } else if (res.data) {
+              setLiveServices((prev) =>
+                prev.map((s) =>
+                  s.id === editingItemId || s._dbId === editingItemId || s.slug === editingItemId
+                    ? { ...s, ...res.data }
+                    : s
+                )
+              );
+            }
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
             setCmsFeedback({ type: "error", text: res?.message || "Failed to update procedure." });
@@ -469,7 +558,11 @@ export default function AdminDashboardClient({
           if (res?.success) {
             setCmsFeedback({ type: "success", text: res.message || "Case added successfully." });
             const ref = await getAdminCasesAction();
-            if (ref?.data) setLiveCases(ref.data);
+            if (ref?.data && ref.data.length > 0) {
+              setLiveCases(ref.data);
+            } else if (res.data) {
+              setLiveCases((prev) => [...prev, res.data]);
+            }
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
             setCmsFeedback({ type: "error", text: res?.message || "Failed to create case." });
@@ -479,7 +572,17 @@ export default function AdminDashboardClient({
           if (res?.success) {
             setCmsFeedback({ type: "success", text: res.message || "Case updated successfully." });
             const ref = await getAdminCasesAction();
-            if (ref?.data) setLiveCases(ref.data);
+            if (ref?.data && ref.data.length > 0) {
+              setLiveCases(ref.data);
+            } else if (res.data) {
+              setLiveCases((prev) =>
+                prev.map((c) =>
+                  c.id === editingItemId || c._dbId === editingItemId || c.slug === editingItemId
+                    ? { ...c, ...res.data }
+                    : c
+                )
+              );
+            }
             setTimeout(() => setCmsModalOpen(false), 800);
           } else {
             setCmsFeedback({ type: "error", text: res?.message || "Failed to update case." });
@@ -499,7 +602,9 @@ export default function AdminDashboardClient({
       const res = await updateStaffAction(id, { is_published: !current });
       if (res?.success) {
         setLiveStaff((prev) =>
-          prev.map((m) => (m.id === id || m._dbId === id ? { ...m, is_published: !current } : m))
+          prev.map((m) =>
+            m.id === id || m._dbId === id || m.slug === id ? { ...m, is_published: !current } : m
+          )
         );
       } else {
         alert(res?.message || "Failed to update publication status.");
@@ -514,7 +619,9 @@ export default function AdminDashboardClient({
       const res = await updateServiceAction(id, { is_published: !current });
       if (res?.success) {
         setLiveServices((prev) =>
-          prev.map((s) => (s.id === id || s._dbId === id ? { ...s, is_published: !current } : s))
+          prev.map((s) =>
+            s.id === id || s._dbId === id || s.slug === id ? { ...s, is_published: !current } : s
+          )
         );
       } else {
         alert(res?.message || "Failed to update publication status.");
@@ -529,7 +636,9 @@ export default function AdminDashboardClient({
       const res = await updateCaseAction(id, { is_published: !current });
       if (res?.success) {
         setLiveCases((prev) =>
-          prev.map((c) => (c.id === id || c._dbId === id ? { ...c, is_published: !current } : c))
+          prev.map((c) =>
+            c.id === id || c._dbId === id || c.slug === id ? { ...c, is_published: !current } : c
+          )
         );
       } else {
         alert(res?.message || "Failed to update publication status.");
@@ -548,7 +657,7 @@ export default function AdminDashboardClient({
     try {
       const res = await deleteStaffAction(id);
       if (res?.success) {
-        setLiveStaff((prev) => prev.filter((m) => m.id !== id && m._dbId !== id));
+        setLiveStaff((prev) => prev.filter((m) => m.id !== id && m._dbId !== id && m.slug !== id));
         setDeleteConfirmId(null);
       } else {
         alert(res?.message || "Failed to delete staff member.");
@@ -566,7 +675,7 @@ export default function AdminDashboardClient({
     try {
       const res = await deleteServiceAction(id);
       if (res?.success) {
-        setLiveServices((prev) => prev.filter((s) => s.id !== id && s._dbId !== id));
+        setLiveServices((prev) => prev.filter((s) => s.id !== id && s._dbId !== id && s.slug !== id));
         setDeleteConfirmId(null);
       } else {
         alert(res?.message || "Failed to delete service.");
@@ -584,7 +693,7 @@ export default function AdminDashboardClient({
     try {
       const res = await deleteCaseAction(id);
       if (res?.success) {
-        setLiveCases((prev) => prev.filter((c) => c.id !== id && c._dbId !== id));
+        setLiveCases((prev) => prev.filter((c) => c.id !== id && c._dbId !== id && c.slug !== id));
         setDeleteConfirmId(null);
       } else {
         alert(res?.message || "Failed to delete case.");
@@ -1403,7 +1512,7 @@ export default function AdminDashboardClient({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {liveStaff.map((m) => {
-                      const itemId = m.id || m._dbId;
+                      const itemId = m._dbId || m.id;
                       const isPublished = m.is_published !== false;
                       const isConfirmingDelete = deleteConfirmId === itemId;
 
@@ -1503,7 +1612,7 @@ export default function AdminDashboardClient({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {liveServices.map((s) => {
-                      const itemId = s.id || s._dbId;
+                      const itemId = s._dbId || s.id;
                       const isPublished = s.is_published !== false;
                       const isConfirmingDelete = deleteConfirmId === itemId;
 
@@ -1598,7 +1707,7 @@ export default function AdminDashboardClient({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {liveCases.map((c) => {
-                      const itemId = c.id || c._dbId;
+                      const itemId = c._dbId || c.id;
                       const isPublished = c.is_published !== false;
                       const isConfirmingDelete = deleteConfirmId === itemId;
 

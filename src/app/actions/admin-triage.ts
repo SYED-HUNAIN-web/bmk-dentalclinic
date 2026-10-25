@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyAdminSession } from "@/lib/supabase/auth-guard";
 import { sendPatientAppointmentConfirmation } from "@/lib/notifications/email";
 import { revalidatePath } from "next/cache";
@@ -223,34 +224,85 @@ export async function updateClinicSettingsAction(settings: {
   lead_surgeon: string;
   address: string;
   phone_display: string;
-  phone_tel: string;
-  whatsapp_url: string;
+  phone_tel?: string;
+  whatsapp_url?: string;
   opening_hours: string;
   emergency_note?: string;
 }): Promise<TriageResponse> {
   const auth = await verifyAdminSession();
   if (auth.status !== "authenticated") {
-    return { success: false, message: "Authorization required." };
+    return { success: false, message: "Authorization required. Please sign in to an active administrative account." };
   }
 
-  const supabase = await createServerSupabaseClient();
-  if (!supabase) {
+  if (auth.profile.role !== "admin" && auth.profile.role !== "surgeon") {
+    return {
+      success: false,
+      message: "Insufficient permissions: Administrative or surgical credentials required to modify clinic configuration.",
+    };
+  }
+
+  const adminClient = createAdminClient();
+  const serverClient = await createServerSupabaseClient();
+  const client = (adminClient || serverClient) as any;
+
+  if (!client) {
     return { success: false, message: "Supabase connection unavailable." };
   }
 
-  const { error } = await (supabase.from("site_settings") as any)
-    .update({
-      ...settings,
-      updated_at: new Date().toISOString(),
-    })
-    .neq("id", "00000000-0000-0000-0000-000000000000"); // update any existing row
+  // Check if an existing row exists in public.site_settings
+  const { data: existing, error: selectErr } = await client
+    .from("site_settings")
+    .select("*")
+    .limit(1)
+    .maybeSingle();
 
-  if (error) {
-    return { success: false, message: error.message };
+  if (selectErr) {
+    return { success: false, message: `Failed to inspect clinic configuration: ${selectErr.message}` };
+  }
+
+  const rawPhone = settings.phone_display
+    ? settings.phone_display.replace(/[^0-9]/g, "").replace(/^0+/, "")
+    : (existing?.phone_display ? existing.phone_display.replace(/[^0-9]/g, "").replace(/^0+/, "") : "3332760510");
+  const phoneTel = settings.phone_tel?.trim() || (settings.phone_display ? `tel:+92${rawPhone}` : (existing?.phone_tel || `tel:+92${rawPhone}`));
+  const whatsappUrl = settings.whatsapp_url?.trim() || (settings.phone_display ? `https://wa.me/92${rawPhone}` : (existing?.whatsapp_url || `https://wa.me/92${rawPhone}`));
+
+  const payload: Record<string, any> = {
+    clinic_name: (settings.clinic_name || existing?.clinic_name || "BMK Dental & Maxillofacial Clinic").trim(),
+    lead_surgeon: (settings.lead_surgeon || existing?.lead_surgeon || "Dr Vishal Lohana (FCPS, BDS)").trim(),
+    address: (settings.address || existing?.address || "Quaid-E-Azam Medical Complex, Clinic No: MF:32, CMH Rd, Saddar, Hyderabad, 72000, Pakistan").trim(),
+    phone_display: (settings.phone_display || existing?.phone_display || "03332760510").trim(),
+    phone_tel: phoneTel,
+    whatsapp_url: whatsappUrl,
+    opening_hours: (settings.opening_hours || existing?.opening_hours || "Monday – Saturday: 4:00 PM – 10:00 PM | Sunday: Closed").trim(),
+    emergency_note: settings.emergency_note !== undefined ? (settings.emergency_note?.trim() || null) : (existing?.emergency_note ?? null),
+    updated_at: new Date().toISOString(),
+  };
+
+  // Atomic upsert: Safely handles empty table initialization and concurrent saves without conflict
+  const targetId = existing?.id || "00000000-0000-0000-0000-000000000001";
+  const { error: upsertErr } = await client
+    .from("site_settings")
+    .upsert(
+      {
+        id: targetId,
+        tagline: existing?.tagline || "Specialist Oral & Maxillofacial Surgery and Restorative Dental Medicine",
+        city: existing?.city || "Hyderabad",
+        postal_code: existing?.postal_code || "72000",
+        country: existing?.country || "Pakistan",
+        email: existing?.email || "consultations@bmkdentalclinic.com",
+        ...payload,
+      },
+      { onConflict: "id" }
+    );
+
+  if (upsertErr) {
+    return { success: false, message: `Failed to save settings: ${upsertErr.message}` };
   }
 
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/about");
-  return { success: true, message: "Clinic configuration updated successfully." };
+  revalidatePath("/services");
+  revalidatePath("/client-work");
+  return { success: true, message: "Clinic profile updated successfully." };
 }

@@ -2,6 +2,7 @@
 
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { verifyAdminSession } from "@/lib/supabase/auth-guard";
 import { revalidatePath } from "next/cache";
 import type { Database, ServiceCategory } from "@/types/database";
@@ -53,6 +54,10 @@ export interface CaseInput {
   is_published?: boolean;
 }
 
+function isUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -65,15 +70,30 @@ function slugify(text: string): string {
 async function requireAdmin() {
   const auth = await verifyAdminSession();
   if (auth.status !== "authenticated") {
-    return { ok: false as const, message: "Authorization required. Please sign in." };
+    return { ok: false as const, message: "Authorization required. Please sign in to an active administrative account." };
   }
 
-  const client = createAdminClient();
-  if (!client) {
-    return { ok: false as const, message: "Supabase administrative client unavailable." };
+  if (auth.profile.role !== "admin" && auth.profile.role !== "surgeon") {
+    return {
+      ok: false as const,
+      message: "Insufficient permissions: Administrative or surgical credentials required to modify clinic content.",
+    };
   }
 
-  return { ok: true as const, client, auth };
+  // 1. Try service-role administrative client first if configured (bypasses RLS)
+  const adminClient = createAdminClient();
+  if (adminClient) {
+    return { ok: true as const, client: adminClient as any, auth, isServiceRole: true };
+  }
+
+  // 2. Fall back to authenticated SSR server client with the admin's session cookies.
+  // Database and storage RLS policies allow full management to authenticated users where public.is_admin() is true.
+  const serverClient = await createServerSupabaseClient();
+  if (serverClient) {
+    return { ok: true as const, client: serverClient as any, auth, isServiceRole: false };
+  }
+
+  return { ok: false as const, message: "Supabase connection unavailable. Please verify your Supabase environment variables." };
 }
 
 // ============================================================================
@@ -161,14 +181,55 @@ export async function updateStaffAction(id: string, input: Partial<StaffInput>):
   if (input.sort_order !== undefined) updates.sort_order = input.sort_order;
   if (input.is_published !== undefined) updates.is_published = input.is_published;
 
-  const { data, error } = await (r.client.from("staff") as any)
-    .update(updates)
-    .eq("id", id)
+  const idOrSlug = id.trim();
+  const query = (r.client.from("staff") as any).update(updates);
+  let { data, error } = await (isUuid(idOrSlug)
+    ? query.eq("id", idOrSlug)
+    : query.eq("slug", idOrSlug)
+  )
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     return { success: false, message: error.message };
+  }
+
+  // If no row matched
+  if (!data) {
+    if (isUuid(idOrSlug)) {
+      return { success: false, message: "Record not found; refresh and try again." };
+    }
+
+    // Preserve slug-based insert only for static manifest records with full details; never create placeholders
+    if (!input.name?.trim() || !input.credentials?.trim() || !input.role?.trim() || !input.bio?.trim()) {
+      return {
+        success: false,
+        message: "Faculty record not found. Full details (name, credentials, role, bio) are required to create a new record.",
+      };
+    }
+
+    const newStaff = {
+      slug: idOrSlug,
+      name: input.name.trim(),
+      credentials: input.credentials.trim(),
+      role: input.role.trim(),
+      gender_badge: input.gender_badge?.trim() || null,
+      bio: input.bio.trim(),
+      specialties: input.specialties || [],
+      image_path: input.image_path?.trim() || "/media/logo.jpeg",
+      image_alt: input.image_alt?.trim() || `${input.name.trim()} portrait`,
+      sort_order: typeof input.sort_order === "number" ? input.sort_order : 10,
+      is_published: input.is_published !== undefined ? input.is_published : true,
+    };
+    const { data: inserted, error: insertError } = await (r.client.from("staff") as any)
+      .insert(newStaff)
+      .select()
+      .maybeSingle();
+
+    if (insertError) {
+      return { success: false, message: insertError.message };
+    }
+    data = inserted;
   }
 
   revalidatePath("/");
@@ -184,9 +245,12 @@ export async function deleteStaffAction(id: string): Promise<CmsResponse> {
 
   if (!id) return { success: false, message: "Staff ID is required." };
 
-  const { error } = await (r.client.from("staff") as any)
-    .delete()
-    .eq("id", id);
+  const idOrSlug = id.trim();
+  const query = (r.client.from("staff") as any).delete();
+  const { error } = await (isUuid(idOrSlug)
+    ? query.eq("id", idOrSlug)
+    : query.eq("slug", idOrSlug)
+  );
 
   if (error) {
     return { success: false, message: error.message };
@@ -297,14 +361,56 @@ export async function updateServiceAction(id: string, input: Partial<ServiceInpu
   if (input.sort_order !== undefined) updates.sort_order = input.sort_order;
   if (input.is_published !== undefined) updates.is_published = input.is_published;
 
-  const { data, error } = await (r.client.from("services") as any)
-    .update(updates)
-    .eq("id", id)
+  const idOrSlug = id.trim();
+  const query = (r.client.from("services") as any).update(updates);
+  let { data, error } = await (isUuid(idOrSlug)
+    ? query.eq("id", idOrSlug)
+    : query.eq("slug", idOrSlug)
+  )
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     return { success: false, message: error.message };
+  }
+
+  // If no row matched
+  if (!data) {
+    if (isUuid(idOrSlug)) {
+      return { success: false, message: "Record not found; refresh and try again." };
+    }
+
+    // Preserve slug-based insert only for static manifest records with full details; never create placeholders
+    if (!input.title?.trim() || !input.category || !input.short_desc?.trim() || !input.full_desc?.trim()) {
+      return {
+        success: false,
+        message: "Service record not found. Full details (title, category, short description, full description) are required to create a new procedure.",
+      };
+    }
+
+    const newService = {
+      service_number: input.service_number?.trim() || "01",
+      slug: idOrSlug,
+      title: input.title.trim(),
+      category: input.category,
+      short_desc: input.short_desc.trim(),
+      full_desc: input.full_desc.trim(),
+      indications: input.indications || [],
+      clinical_approach: input.clinical_approach?.trim() || null,
+      image_path: input.image_path?.trim() || "/media/logo.jpeg",
+      image_alt: input.image_alt?.trim() || `${input.title.trim()} procedure`,
+      sort_order: typeof input.sort_order === "number" ? input.sort_order : 10,
+      is_published: input.is_published !== undefined ? input.is_published : true,
+    };
+    const { data: inserted, error: insertError } = await (r.client.from("services") as any)
+      .insert(newService)
+      .select()
+      .maybeSingle();
+
+    if (insertError) {
+      return { success: false, message: insertError.message };
+    }
+    data = inserted;
   }
 
   revalidatePath("/");
@@ -320,9 +426,12 @@ export async function deleteServiceAction(id: string): Promise<CmsResponse> {
 
   if (!id) return { success: false, message: "Service ID is required." };
 
-  const { error } = await (r.client.from("services") as any)
-    .delete()
-    .eq("id", id);
+  const idOrSlug = id.trim();
+  const query = (r.client.from("services") as any).delete();
+  const { error } = await (isUuid(idOrSlug)
+    ? query.eq("id", idOrSlug)
+    : query.eq("slug", idOrSlug)
+  );
 
   if (error) {
     return { success: false, message: error.message };
@@ -430,14 +539,62 @@ export async function updateCaseAction(id: string, input: Partial<CaseInput>): P
   if (input.sort_order !== undefined) updates.sort_order = input.sort_order;
   if (input.is_published !== undefined) updates.is_published = input.is_published;
 
-  const { data, error } = await (r.client.from("projects") as any)
-    .update(updates)
-    .eq("id", id)
+  const idOrSlug = id.trim();
+  const query = (r.client.from("projects") as any).update(updates);
+  let { data, error } = await (isUuid(idOrSlug)
+    ? query.eq("id", idOrSlug)
+    : query.eq("slug", idOrSlug)
+  )
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     return { success: false, message: error.message };
+  }
+
+  // If no row matched
+  if (!data) {
+    if (isUuid(idOrSlug)) {
+      return { success: false, message: "Record not found; refresh and try again." };
+    }
+
+    // Preserve slug-based insert only for static manifest records with full details; never create placeholders
+    if (
+      !input.title?.trim() ||
+      !input.category?.trim() ||
+      !input.modality?.trim() ||
+      !input.diagnostic_method?.trim() ||
+      !input.clinical_summary?.trim() ||
+      !input.procedure_notes?.trim()
+    ) {
+      return {
+        success: false,
+        message: "Clinical case record not found. Complete details (title, category, modality, diagnostic method, summary, procedure notes) are required to create a new case.",
+      };
+    }
+
+    const newCase = {
+      slug: idOrSlug,
+      title: input.title.trim(),
+      category: input.category.trim(),
+      modality: input.modality.trim(),
+      diagnostic_method: input.diagnostic_method.trim(),
+      clinical_summary: input.clinical_summary.trim(),
+      procedure_notes: input.procedure_notes.trim(),
+      image_path: input.image_path?.trim() || "/media/logo.jpeg",
+      image_alt: input.image_alt?.trim() || `${input.title.trim()} record`,
+      sort_order: typeof input.sort_order === "number" ? input.sort_order : 10,
+      is_published: input.is_published !== undefined ? input.is_published : true,
+    };
+    const { data: inserted, error: insertError } = await (r.client.from("projects") as any)
+      .insert(newCase)
+      .select()
+      .maybeSingle();
+
+    if (insertError) {
+      return { success: false, message: insertError.message };
+    }
+    data = inserted;
   }
 
   revalidatePath("/");
@@ -453,9 +610,12 @@ export async function deleteCaseAction(id: string): Promise<CmsResponse> {
 
   if (!id) return { success: false, message: "Case ID is required." };
 
-  const { error } = await (r.client.from("projects") as any)
-    .delete()
-    .eq("id", id);
+  const idOrSlug = id.trim();
+  const query = (r.client.from("projects") as any).delete();
+  const { error } = await (isUuid(idOrSlug)
+    ? query.eq("id", idOrSlug)
+    : query.eq("slug", idOrSlug)
+  );
 
   if (error) {
     return { success: false, message: error.message };
@@ -528,7 +688,30 @@ export async function uploadClinicMediaAction(formData: FormData): Promise<CmsRe
       });
 
     if (uploadError) {
-      return { success: false, message: `Storage upload failed: ${uploadError.message}` };
+      const msg = uploadError.message || "";
+      if (
+        msg.toLowerCase().includes("bucket not found") ||
+        (uploadError as any)?.statusCode === "404" ||
+        (uploadError as any)?.error === "Bucket not found"
+      ) {
+        return {
+          success: false,
+          message:
+            "Supabase Storage bucket 'clinic-media' not found. Please create a public bucket named 'clinic-media' in your Supabase Dashboard Storage section, or run migration 003_storage_buckets.sql.",
+        };
+      }
+      if (
+        msg.toLowerCase().includes("row-level security") ||
+        msg.toLowerCase().includes("policy") ||
+        (uploadError as any)?.statusCode === "403"
+      ) {
+        return {
+          success: false,
+          message:
+            "Storage upload permission denied by RLS policy. Verify your administrator user is active in public.admin_users and migration 003_storage_buckets.sql has been applied.",
+        };
+      }
+      return { success: false, message: `Storage upload failed: ${msg}` };
     }
 
     const { data: publicUrlData } = r.client.storage
