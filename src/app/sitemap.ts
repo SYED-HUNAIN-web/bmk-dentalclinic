@@ -1,9 +1,11 @@
 import { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL;
-  // If no production URL is configured, fall back to relative paths or empty base
-  const baseUrl = rawUrl ? rawUrl.replace(/\/+$/, "") : "";
+  const rawUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://bmk-dental-clinic.vercel.app";
+  const baseUrl = rawUrl.replace(/\/+$/, "");
 
   // Verified public routes
   const routes = [

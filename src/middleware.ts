@@ -19,6 +19,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Next.js Server Actions are POST requests with a Next-Action header.
+  // They must NOT be intercepted by cookie-based redirect logic because:
+  //   1. The actions enforce their own auth via verifyAdminSession() / requireAdmin().
+  //   2. A middleware redirect returns an HTML redirect response instead of the
+  //      action's JSON, causing the client to receive `undefined` and show
+  //      generic fallback errors ("Failed to delete staff member", etc.).
+  if (request.headers.get("next-action") !== null) {
+    return NextResponse.next();
+  }
+
   const hasActiveSession = Boolean(
     request.cookies.get(ADMIN_ACTIVE_COOKIE)?.value ||
     request.cookies.get(ADMIN_IN_AREA_COOKIE)?.value

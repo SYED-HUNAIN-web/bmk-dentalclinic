@@ -381,6 +381,45 @@ export interface Database {
         };
         Relationships: [];
       };
+      patient_reviews: {
+        Row: {
+          id: string;
+          patient_name: string;
+          rating: number;
+          treatment_type: string | null;
+          review_text: string;
+          location: string | null;
+          status: "pending" | "approved" | "rejected";
+          admin_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          patient_name: string;
+          rating: number;
+          treatment_type?: string | null;
+          review_text: string;
+          location?: string | null;
+          status?: "pending" | "approved" | "rejected";
+          admin_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          patient_name?: string;
+          rating?: number;
+          treatment_type?: string | null;
+          review_text?: string;
+          location?: string | null;
+          status?: "pending" | "approved" | "rejected";
+          admin_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

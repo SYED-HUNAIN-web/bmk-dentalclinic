@@ -22,10 +22,13 @@ const dmSerifDisplay = DM_Serif_Display({
   style: ["normal", "italic"],
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL;
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "https://bmk-dental-clinic.vercel.app";
 
 export const metadata: Metadata = {
-  ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
+  metadataBase: new URL(siteUrl),
   title: {
     default: `${CLINIC_INFO.name} | ${CLINIC_INFO.leadSurgeon}`,
     template: `%s | ${CLINIC_INFO.name}`,

@@ -29,6 +29,11 @@ import {
   deleteCaseAction,
   uploadClinicMediaAction,
 } from "@/app/actions/admin-cms";
+import {
+  getAdminReviewsAction,
+  moderateReviewAction,
+  deleteReviewAction,
+} from "@/app/actions/admin-reviews";
 import type { AdminProfile } from "@/lib/supabase/auth-guard";
 import type { AppointmentStatus, ServiceCategory } from "@/types/database";
 import {
@@ -82,6 +87,7 @@ interface AdminDashboardClientProps {
   staffList: any[];
   servicesList: any[];
   casesList: any[];
+  initialReviews?: any[];
 }
 
 export default function AdminDashboardClient({
@@ -92,14 +98,19 @@ export default function AdminDashboardClient({
   staffList,
   servicesList,
   casesList,
+  initialReviews = [],
 }: AdminDashboardClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<
     "overview" | "appointments" | "content" | "settings"
   >("overview");
   const [contentSubTab, setContentSubTab] = useState<
-    "hours" | "staff" | "services" | "cases"
+    "hours" | "staff" | "services" | "cases" | "reviews"
   >("hours");
+
+  const [liveReviews, setLiveReviews] = useState<any[]>(initialReviews);
+  const [reviewFilter, setReviewFilter] = useState<string>("all");
+  const [isUpdatingReview, setIsUpdatingReview] = useState<string | null>(null);
 
   // Appointments state
   const [appointments, setAppointments] = useState<any[]>(initialAppointments);
@@ -1370,6 +1381,7 @@ export default function AdminDashboardClient({
                     { id: "staff", label: `Faculty (${liveStaff.length})` },
                     { id: "services", label: `Services (${liveServices.length})` },
                     { id: "cases", label: `Cases (${liveCases.length})` },
+                    { id: "reviews", label: `Reviews (${liveReviews.length})` },
                   ].map((sub) => (
                     <button
                       key={sub.id}
@@ -1780,6 +1792,179 @@ export default function AdminDashboardClient({
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Subtab: Patient Reviews Moderation */}
+              {contentSubTab === "reviews" && (
+                <div className="space-y-6 pt-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="font-serif text-lg text-[#103629]">
+                        Visitor &amp; Patient Reviews Moderation
+                      </h3>
+                      <p className="text-xs text-[#707873] font-sans">
+                        Approve, reject, or manage reviews submitted by website visitors and treated patients. Only approved reviews appear on the public homepage.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {["all", "pending", "approved", "rejected"].map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => setReviewFilter(status)}
+                          className={`px-3 py-1 text-xs font-mono uppercase tracking-wider transition-colors ${
+                            reviewFilter === status
+                              ? "bg-[#103629] text-[#F7F5EF] font-bold"
+                              : "bg-[#FAF9F6] text-[#545C57] border border-[#E4E0D6] hover:bg-white"
+                          }`}
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {liveReviews.length === 0 ? (
+                    <div className="p-8 text-center text-xs font-sans text-[#707873] bg-[#FAF9F6] border border-[#E4E0D6]">
+                      No reviews found in the database.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {liveReviews
+                        .filter((r) => reviewFilter === "all" || r.status === reviewFilter)
+                        .map((rev) => {
+                          const isProcessing = isUpdatingReview === rev.id;
+                          return (
+                            <div
+                              key={rev.id}
+                              className="p-5 bg-[#FAF9F6] border border-[#E4E0D6] flex flex-col md:flex-row md:items-start justify-between gap-4"
+                            >
+                              <div className="space-y-2 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-serif text-base text-[#103629] font-medium">
+                                    {rev.patient_name}
+                                  </span>
+                                  <span className="text-xs text-[#707873] font-sans">
+                                    &bull; {rev.location || "Hyderabad"}
+                                  </span>
+                                  {rev.treatment_type && (
+                                    <span className="px-2 py-0.5 bg-[#EFECE3] border border-[#E4E0D6] text-[10px] font-mono uppercase tracking-wider text-[#103629]">
+                                      {rev.treatment_type}
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider font-semibold ${
+                                      rev.status === "approved"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : rev.status === "rejected"
+                                        ? "bg-red-100 text-red-800"
+                                        : "bg-amber-100 text-amber-800"
+                                    }`}
+                                  >
+                                    {rev.status}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1 text-[#B69A61]">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <span key={i} className="text-sm">
+                                      {i < (rev.rating || 5) ? "★" : "☆"}
+                                    </span>
+                                  ))}
+                                  <span className="text-xs font-mono text-[#707873] ml-1">
+                                    ({rev.rating || 5}/5)
+                                  </span>
+                                </div>
+
+                                <p className="text-xs text-[#202622] font-sans leading-relaxed italic bg-white p-3 border border-[#E4E0D6]">
+                                  &ldquo;{rev.review_text}&rdquo;
+                                </p>
+                              </div>
+
+                              <div className="flex md:flex-col items-center md:items-end gap-2 shrink-0">
+                                {rev.status !== "approved" && (
+                                  <button
+                                    type="button"
+                                    disabled={isProcessing}
+                                    onClick={async () => {
+                                      setIsUpdatingReview(rev.id);
+                                      const res = await moderateReviewAction({
+                                        id: rev.id,
+                                        status: "approved",
+                                      });
+                                      if (res.success) {
+                                        setLiveReviews((prev) =>
+                                          prev.map((r) =>
+                                            r.id === rev.id ? { ...r, status: "approved" } : r
+                                          )
+                                        );
+                                      } else {
+                                        alert(res.message);
+                                      }
+                                      setIsUpdatingReview(null);
+                                    }}
+                                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-sans uppercase tracking-wider font-semibold disabled:opacity-50"
+                                  >
+                                    Approve
+                                  </button>
+                                )}
+
+                                {rev.status !== "rejected" && (
+                                  <button
+                                    type="button"
+                                    disabled={isProcessing}
+                                    onClick={async () => {
+                                      setIsUpdatingReview(rev.id);
+                                      const res = await moderateReviewAction({
+                                        id: rev.id,
+                                        status: "rejected",
+                                      });
+                                      if (res.success) {
+                                        setLiveReviews((prev) =>
+                                          prev.map((r) =>
+                                            r.id === rev.id ? { ...r, status: "rejected" } : r
+                                          )
+                                        );
+                                      } else {
+                                        alert(res.message);
+                                      }
+                                      setIsUpdatingReview(null);
+                                    }}
+                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-sans uppercase tracking-wider font-semibold disabled:opacity-50"
+                                  >
+                                    Reject
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  disabled={isProcessing}
+                                  onClick={async () => {
+                                    if (confirm(`Delete review from ${rev.patient_name}?`)) {
+                                      setIsUpdatingReview(rev.id);
+                                      const res = await deleteReviewAction(rev.id);
+                                      if (res.success) {
+                                        setLiveReviews((prev) =>
+                                          prev.filter((r) => r.id !== rev.id)
+                                        );
+                                      } else {
+                                        alert(res.message);
+                                      }
+                                      setIsUpdatingReview(null);
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 text-red-700 hover:bg-red-50 text-xs font-sans uppercase tracking-wider font-semibold disabled:opacity-50"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

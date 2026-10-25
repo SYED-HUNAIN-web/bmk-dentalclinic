@@ -160,3 +160,47 @@ export async function getPublicCases(): Promise<ClientCase[]> {
     return CLIENT_CASES;
   }
 }
+
+export interface PatientReview {
+  id: string;
+  patient_name: string;
+  rating: number;
+  treatment_type: string | null;
+  review_text: string;
+  location: string | null;
+  status: "pending" | "approved" | "rejected";
+  created_at?: string;
+  _dbId?: string;
+}
+
+export const DEFAULT_REVIEWS: PatientReview[] = [];
+
+export async function getPublicReviews(): Promise<PatientReview[]> {
+  try {
+    const supabase = createPublicServerClient();
+    if (!supabase) return DEFAULT_REVIEWS;
+
+    const { data, error } = await (supabase.from("patient_reviews") as any)
+      .select("*")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      return DEFAULT_REVIEWS;
+    }
+
+    return data.map((item: any) => ({
+      id: item.id,
+      patient_name: item.patient_name,
+      rating: item.rating,
+      treatment_type: item.treatment_type,
+      review_text: item.review_text,
+      location: item.location,
+      status: item.status,
+      created_at: item.created_at,
+      _dbId: item.id,
+    }));
+  } catch {
+    return DEFAULT_REVIEWS;
+  }
+}

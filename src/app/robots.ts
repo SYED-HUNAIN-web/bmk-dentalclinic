@@ -1,7 +1,10 @@
 import { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL;
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://bmk-dental-clinic.vercel.app";
 
   return {
     rules: [
@@ -17,6 +20,6 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    ...(siteUrl ? { sitemap: `${siteUrl.replace(/\/+$/, "")}/sitemap.xml` } : {}),
+    sitemap: `${siteUrl.replace(/\/+$/, "")}/sitemap.xml`,
   };
 }

@@ -189,6 +189,7 @@ ON CONFLICT (id) DO NOTHING;`}
   let staffList: any[] = [];
   let servicesList: any[] = [];
   let casesList: any[] = [];
+  let reviewsList: any[] = [];
 
   if (supabase) {
     const { data: apps } = await (supabase.from("appointments") as any)
@@ -216,6 +217,11 @@ ON CONFLICT (id) DO NOTHING;`}
       .select("*")
       .order("sort_order", { ascending: true });
     casesList = casesData || [];
+
+    const { data: reviewsData } = await (supabase.from("patient_reviews") as any)
+      .select("*")
+      .order("created_at", { ascending: false });
+    reviewsList = reviewsData || [];
   }
 
   const initialStats = {
@@ -247,6 +253,7 @@ ON CONFLICT (id) DO NOTHING;`}
       staffList={staffList.length > 0 ? staffList : CLINIC_TEAM}
       servicesList={servicesList.length > 0 ? servicesList : CLINIC_SERVICES}
       casesList={casesList.length > 0 ? casesList : CLIENT_CASES}
+      initialReviews={reviewsList}
     />
   );
 }

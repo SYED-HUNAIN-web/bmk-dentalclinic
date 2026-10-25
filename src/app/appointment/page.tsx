@@ -43,6 +43,7 @@ const today = new Date().toISOString().split("T")[0];
 
 export default function AppointmentPage() {
   const [formState, setFormState] = useState<FormState>("idle");
+  const [referenceId, setReferenceId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
@@ -141,6 +142,9 @@ export default function AppointmentPage() {
         return;
       }
 
+      if (res.referenceId) {
+        setReferenceId(res.referenceId);
+      }
       setFormState("submitted");
     } catch (err) {
       console.error("Submission error:", err);
@@ -189,10 +193,24 @@ export default function AppointmentPage() {
             <p>
               Thank you, <strong className="text-[#103629] dark:text-[#F7F5EF]">{formData.patientName}</strong>. Dr Vishal Lohana and his team will review your appointment request.
             </p>
+            {referenceId && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#FAF9F6] dark:bg-[#0F261D] border border-[#E4E0D6] dark:border-[#1E4234] text-xs font-mono">
+                <span className="text-[#707873] dark:text-[#A8B2AC] uppercase text-[10px]">Reference ID:</span>
+                <span className="font-bold text-[#103629] dark:text-[#B69A61]">{referenceId}</span>
+              </div>
+            )}
             <p className="text-xs text-[#707873] dark:text-[#A8B2AC]">
               Our clinical coordinator will contact you by telephone at{" "}
               <strong className="text-[#103629] dark:text-[#F7F5EF] font-mono">{formData.phone}</strong> during practice hours (Monday – Saturday: 4:00 PM – 10:00 PM) to confirm availability and finalize your appointment time.
             </p>
+            {formData.email && (
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-200 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span>
+                  An automatic consultation receipt was dispatched to <strong>{formData.email}</strong>. Please check your inbox or spam folder.
+                </span>
+              </div>
+            )}
             <div className="bg-[#FAF9F6] dark:bg-[#0F261D] p-4 border border-[#E4E0D6] dark:border-[#1E4234] text-xs font-mono text-[#545C57] dark:text-[#CBD5CF] space-y-1">
               <div>
                 <span className="text-[#707873] dark:text-[#A8B2AC] uppercase text-[10px] block">Requested Preference:</span>
@@ -231,6 +249,7 @@ export default function AppointmentPage() {
             <button
               onClick={() => {
                 setFormState("idle");
+                setReferenceId(null);
                 setFormData({
                   patientName: "",
                   phone: "",
@@ -388,6 +407,9 @@ export default function AppointmentPage() {
                     aria-describedby={errors.email ? "email-error" : undefined}
                     aria-invalid={!!errors.email}
                   />
+                  <span className="text-[11px] text-[#707873] dark:text-[#A8B2AC] font-sans block">
+                    Provide your email to receive an immediate electronic consultation receipt with clinic coordinates.
+                  </span>
                   {errors.email && (
                     <p id="email-error" className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1 font-sans">
                       <AlertCircle className="w-3.5 h-3.5" />

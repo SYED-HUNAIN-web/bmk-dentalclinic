@@ -191,12 +191,14 @@ export async function updateStaffAction(id: string, input: Partial<StaffInput>):
     .maybeSingle();
 
   if (error) {
+    console.error("[updateStaffAction] Supabase error:", error.message, "| id:", idOrSlug);
     return { success: false, message: error.message };
   }
 
   // If no row matched
   if (!data) {
     if (isUuid(idOrSlug)) {
+      console.error("[updateStaffAction] No row matched UUID:", idOrSlug);
       return { success: false, message: "Record not found; refresh and try again." };
     }
 
@@ -253,6 +255,7 @@ export async function deleteStaffAction(id: string): Promise<CmsResponse> {
   );
 
   if (error) {
+    console.error("[deleteStaffAction] Supabase error:", error.message, "| id:", idOrSlug);
     return { success: false, message: error.message };
   }
 
@@ -371,12 +374,14 @@ export async function updateServiceAction(id: string, input: Partial<ServiceInpu
     .maybeSingle();
 
   if (error) {
+    console.error("[updateServiceAction] Supabase error:", error.message, "| id:", idOrSlug);
     return { success: false, message: error.message };
   }
 
   // If no row matched
   if (!data) {
     if (isUuid(idOrSlug)) {
+      console.error("[updateServiceAction] No row matched UUID:", idOrSlug);
       return { success: false, message: "Record not found; refresh and try again." };
     }
 
@@ -434,6 +439,7 @@ export async function deleteServiceAction(id: string): Promise<CmsResponse> {
   );
 
   if (error) {
+    console.error("[deleteServiceAction] Supabase error:", error.message, "| id:", idOrSlug);
     return { success: false, message: error.message };
   }
 
@@ -549,12 +555,14 @@ export async function updateCaseAction(id: string, input: Partial<CaseInput>): P
     .maybeSingle();
 
   if (error) {
+    console.error("[updateCaseAction] Supabase error:", error.message, "| id:", idOrSlug);
     return { success: false, message: error.message };
   }
 
   // If no row matched
   if (!data) {
     if (isUuid(idOrSlug)) {
+      console.error("[updateCaseAction] No row matched UUID:", idOrSlug);
       return { success: false, message: "Record not found; refresh and try again." };
     }
 
@@ -618,6 +626,7 @@ export async function deleteCaseAction(id: string): Promise<CmsResponse> {
   );
 
   if (error) {
+    console.error("[deleteCaseAction] Supabase error:", error.message, "| id:", idOrSlug);
     return { success: false, message: error.message };
   }
 
@@ -711,6 +720,7 @@ export async function uploadClinicMediaAction(formData: FormData): Promise<CmsRe
             "Storage upload permission denied by RLS policy. Verify your administrator user is active in public.admin_users and migration 003_storage_buckets.sql has been applied.",
         };
       }
+      console.error("[uploadClinicMediaAction] Storage error:", uploadError.message, "| statusCode:", (uploadError as any)?.statusCode, "| path:", storagePath);
       return { success: false, message: `Storage upload failed: ${msg}` };
     }
 

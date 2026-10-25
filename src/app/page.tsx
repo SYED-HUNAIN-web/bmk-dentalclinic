@@ -1,8 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CLINIC_INFO, CLINIC_VIDEOS } from "@/data/mediaManifest";
-import { getPublicStaff, getPublicServices, getPublicCases } from "@/lib/data/clinic-data";
+import { getPublicStaff, getPublicServices, getPublicCases, getPublicReviews } from "@/lib/data/clinic-data";
 import VideoPlayer from "@/components/VideoPlayer";
+import PatientReviewsSection from "@/components/PatientReviewsSection";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -30,10 +31,11 @@ export const metadata: Metadata = {
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [clinicTeam, clinicServices, clientCases] = await Promise.all([
+  const [clinicTeam, clinicServices, clientCases, patientReviews] = await Promise.all([
     getPublicStaff(),
     getPublicServices(),
     getPublicCases(),
+    getPublicReviews(),
   ]);
 
   const drVishal =
@@ -729,6 +731,11 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ─────────────────────────────────────────────────────────────
+          5.5 PATIENT REVIEWS & VERIFIED CLINICAL TESTIMONIALS
+      ────────────────────────────────────────────────────────────── */}
+      <PatientReviewsSection initialReviews={patientReviews} />
 
       {/* ─────────────────────────────────────────────────────────────
           6. APPOINTMENT CALL TO ACTION — Decisive & Restrained
