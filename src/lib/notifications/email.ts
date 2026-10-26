@@ -119,12 +119,12 @@ export async function sendClinicNewAppointmentAlert(appointment: {
   preferred_time_slot: string;
   dental_concern: string;
 }) {
-  // Prefer CLINIC_ADMIN_EMAIL (added to .env.local) then fall back to the legacy
-  // CLINIC_NOTIFICATION_EMAIL variable and finally to the hard-coded manifest value.
+  // 1. Prefer CLINIC_ADMIN_EMAIL or CLINIC_NOTIFICATION_EMAIL if set in environment.
+  // 2. Fall back directly to the verified clinic mailbox: bmkdentalmaxillofacialclinic@gmail.com
   const clinicRecipient =
     process.env.CLINIC_ADMIN_EMAIL ||
     process.env.CLINIC_NOTIFICATION_EMAIL ||
-    CLINIC_INFO.email;
+    "bmkdentalmaxillofacialclinic@gmail.com";
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e4e0d6; background: #faf9f6;">

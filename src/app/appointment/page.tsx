@@ -207,7 +207,7 @@ export default function AppointmentPage() {
               <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-200 flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <span>
-                  An automatic consultation receipt was dispatched to <strong>{formData.email}</strong>. Please check your inbox or spam folder.
+                  A request receipt acknowledging your pending submission was dispatched to <strong>{formData.email}</strong>. Please note that this is an acknowledgment of receipt, not a finalized booking confirmation.
                 </span>
               </div>
             )}
