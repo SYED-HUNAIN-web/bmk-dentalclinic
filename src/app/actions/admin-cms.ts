@@ -70,7 +70,7 @@ function slugify(text: string): string {
 async function requireAdmin() {
   const auth = await verifyAdminSession();
   if (auth.status !== "authenticated") {
-    return { ok: false as const, message: "Authorization required. Please sign in to an active administrative account." };
+    return { ok: false as const, message: auth.message || "Authorization required. Please sign in to an active administrative account." };
   }
 
   if (auth.profile.role !== "admin" && auth.profile.role !== "surgeon") {

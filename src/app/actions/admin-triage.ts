@@ -231,7 +231,7 @@ export async function updateClinicSettingsAction(settings: {
 }): Promise<TriageResponse> {
   const auth = await verifyAdminSession();
   if (auth.status !== "authenticated") {
-    return { success: false, message: "Authorization required. Please sign in to an active administrative account." };
+    return { success: false, message: auth.message || "Authorization required. Please sign in to an active administrative account." };
   }
 
   if (auth.profile.role !== "admin" && auth.profile.role !== "surgeon") {

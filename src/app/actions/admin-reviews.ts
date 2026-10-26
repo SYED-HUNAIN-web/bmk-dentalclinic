@@ -5,6 +5,9 @@ import { createPublicServerClient } from "@/lib/supabase/public";
 import { verifyAdminSession } from "@/lib/supabase/auth-guard";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
+
+type ReviewInsert = Database["public"]["Tables"]["patient_reviews"]["Insert"];
 
 export interface ReviewSubmissionInput {
   patient_name: string;
@@ -59,17 +62,17 @@ export async function submitPublicReviewAction(
     };
   }
 
-  const { data, error } = await (supabase.from("patient_reviews") as any)
-    .insert({
-      patient_name: name,
-      rating: Math.round(rating),
-      treatment_type: input.treatment_type?.trim() || null,
-      review_text: text,
-      location: input.location?.trim() || "Hyderabad",
-      status: "pending",
-    })
-    .select("id")
-    .single();
+  const payload: ReviewInsert = {
+    patient_name: name,
+    rating: Math.round(rating),
+    treatment_type: input.treatment_type?.trim() || null,
+    review_text: text,
+    location: input.location?.trim() || "Hyderabad",
+    status: "pending",
+  };
+
+  const { error } = await (supabase.from("patient_reviews") as any)
+    .insert(payload);
 
   if (error) {
     console.error("[submitPublicReviewAction] Supabase error:", error.message);
@@ -82,7 +85,6 @@ export async function submitPublicReviewAction(
   return {
     success: true,
     message: "Thank you for your feedback! Your review has been submitted for moderation and will appear publicly once verified by our clinic team.",
-    data,
   };
 }
 

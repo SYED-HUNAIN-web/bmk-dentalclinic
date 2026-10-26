@@ -59,6 +59,7 @@ export async function verifyAdminSession(): Promise<AuthGuardResult> {
   const departed = cookieStore.get("bmk_admin_departed")?.value;
 
   if (departed) {
+    console.warn("[verifyAdminSession]: Rejected due to 'bmk_admin_departed' cookie.");
     await supabase.auth.signOut();
     try {
       cookieStore.set("bmk_admin_departed", "", { maxAge: 0, path: "/" });
@@ -80,6 +81,7 @@ export async function verifyAdminSession(): Promise<AuthGuardResult> {
     const lastActive = parseInt(lastActiveStr, 10);
     const now = Date.now();
     if (!isNaN(lastActive) && now - lastActive > ADMIN_SESSION_TIMEOUT_SECONDS * 1000) {
+      console.warn("[verifyAdminSession]: Rejected due to inactivity timeout.");
       await supabase.auth.signOut();
       try {
         cookieStore.set(ADMIN_SESSION_COOKIE_NAME, "", { maxAge: 0, path: "/" });
@@ -102,13 +104,14 @@ export async function verifyAdminSession(): Promise<AuthGuardResult> {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
+    console.warn("[verifyAdminSession]: No active user found from supabase.auth.getUser(). authError:", authError?.message || "none");
     return {
       status: "unauthenticated",
       message: "No active authenticated session found. Please sign in.",
     };
   }
 
-  // 2. Validate against public.admin_users table (Database RBAC)
+  // 3. Validate against public.admin_users table (Database RBAC)
   const { data: profile, error: profileError } = await (
     supabase.from("admin_users") as any
   )
@@ -116,7 +119,17 @@ export async function verifyAdminSession(): Promise<AuthGuardResult> {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profileError || !profile) {
+  if (profileError) {
+    console.warn("[verifyAdminSession]: Error querying public.admin_users for user:", user.id, "error:", profileError.message);
+    return {
+      status: "unauthorized",
+      userEmail: user.email || "Unknown",
+      message: `Database error querying admin roster: ${profileError.message}`,
+    };
+  }
+
+  if (!profile) {
+    console.warn("[verifyAdminSession]: User ID", user.id, "not found in public.admin_users table.");
     return {
       status: "unauthorized",
       userEmail: user.email || "Unknown",
@@ -126,6 +139,7 @@ export async function verifyAdminSession(): Promise<AuthGuardResult> {
   }
 
   if (!profile.is_active) {
+    console.warn("[verifyAdminSession]: User", user.id, "is marked is_active = false in public.admin_users.");
     return {
       status: "unauthorized",
       userEmail: user.email || "Unknown",
